@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Effort Estimator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PeerJS for WebRTC P2P -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- SheetJS (xlsx) for exporting Excel file -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Chart.js for Visual Contribution Pie Chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .tab-btn.active {
+            border-bottom-color: #0d9488;
+            color: #0f766e;
+            font-weight: 700;
+        }
+        /* Custom styling for compact matrix tables */
+        .matrix-table th, .matrix-table td {
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header / Navbar -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40 border-b border-slate-800">
+        <div class="max-w-[98%] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-teal-500/20 p-2 rounded-lg border border-teal-500/30">
+                    <i data-lucide="calculator" class="w-6 h-6 text-teal-400"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight flex items-center gap-2">
+                        ƯỚC LƯỢNG DỰ ÁN
+                    </h1>
+                    <p class="text-xs text-slate-400">Công cụ tính toán chi phí chức năng phần mềm</p>
+                </div>
+            </div>
+
+            <!-- Action Controls & P2P Status -->
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- P2P Connection Status -->
+                <div class="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700">
+                    <div class="flex items-center px-2 text-xs text-slate-300 gap-1.5">
+                        <span id="connection-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="connection-status-text" class="font-medium">Tab Sync</span>
+                    </div>
+                    <button onclick="copyShareLink()" class="px-2.5 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-teal-300 rounded font-medium transition flex items-center gap-1 border border-slate-600">
+                        <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+                        Chia sẻ
+                    </button>
+                </div>
+
+                <!-- Backup & Restore JSON Buttons -->
+                <div class="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                    <button onclick="exportToJSON()" class="px-2.5 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-medium transition flex items-center gap-1" title="Sao lưu toàn bộ dữ liệu ra file JSON">
+                        <i data-lucide="download" class="w-3.5 h-3.5 text-teal-400"></i>
+                        Lưu tạm
+                    </button>
+                    <label class="px-2.5 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded font-medium transition flex items-center gap-1 cursor-pointer" title="Khôi phục dữ liệu từ file JSON">
+                        <i data-lucide="upload" class="w-3.5 h-3.5 text-amber-400"></i>
+                        Khôi phục
+                        <input type="file" id="import-json-file" accept=".json" onchange="importFromJSON(event)" class="hidden">
+                    </label>
+                </div>
+
+                <!-- Export Excel Button -->
+                <button onclick="exportToExcel()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-sm shadow-md transition flex items-center gap-2">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                    Xuất Excel
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-white border-b border-slate-200 sticky top-[61px] z-30 shadow-sm">
+        <div class="max-w-[98%] mx-auto px-4 flex gap-6">
+            <button id="tab-btn-features" onclick="switchTab('features')" class="tab-btn active py-3 px-2 border-b-2 border-teal-600 text-teal-700 font-semibold text-sm flex items-center gap-2 transition">
+                <i data-lucide="table-properties" class="w-4 h-4"></i>
+                1. Danh sách chức năng
+            </button>
+            <button id="tab-btn-overview" onclick="switchTab('overview')" class="tab-btn py-3 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-700 font-semibold text-sm flex items-center gap-2 transition">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                2. Thông tin dự án & Cấu hình hệ số
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-[98%] w-full mx-auto p-3 md:p-5">
+        
+        <!-- TAB 1: EDITABLE MATRIX FEATURES TABLE -->
+        <div id="tab-features-content" class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+            <div class="p-3 bg-slate-800 text-white border-b border-slate-700 flex flex-wrap justify-between items-center gap-2">
+                <div>
+                    <h2 class="font-bold text-sm md:text-base flex items-center gap-2 text-teal-400">
+                        <i data-lucide="table" class="w-5 h-5"></i>
+                        BẢNG ƯỚC LƯỢNG NỖ LỰC CHI TIẾT 
+                    </h2>
+                    <p class="text-xs text-slate-300">Công thức: Effort = (Giờ CRUD cơ sở) × (Hệ số UI × DB × Job × API × Media) × Buffer (Làm tròn 1 chữ số thập phân)</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- Dashboard Mini KPI -->
+                    <div class="flex items-center gap-3 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
+                        <div>Tổng Effort: <span id="kpi-total-hours" class="font-bold text-amber-400">0</span> giờ</div>
+                        <div class="text-slate-500">|</div>
+                        <div>Quy đổi: <span id="kpi-person-days" class="font-bold text-emerald-400">0</span> ngày công</div>
+                    </div>
+                    <button onclick="addFeatureRow()" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-semibold shadow transition flex items-center gap-1">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> Thêm Chức năng
+                    </button>
+                </div>
+            </div>
+
+            <!-- Editable Table Container -->
+            <div class="overflow-x-auto p-2 custom-scrollbar">
+                <table class="w-full border-collapse border border-slate-300 text-xs matrix-table min-w-[1250px]">
+                    <thead>
+                        <!-- Header Row 1: Group Headers -->
+                        <tr class="bg-slate-800 text-white font-bold text-center border-b border-slate-700">
+                            <th rowspan="2" class="border border-slate-600 p-2 w-10">STT</th>
+                            <th rowspan="2" class="border border-slate-600 p-2 min-w-[200px]">Tên Usecase / Chức năng</th>
+                            <th colspan="5" class="border border-slate-600 p-1.5 bg-sky-900/80 text-sky-200">Thao tác CRUD cơ bản</th>
+                            <th colspan="5" class="border border-slate-600 p-1.5 bg-indigo-900/80 text-indigo-200">Tham số Độ phức tạp & Kỹ thuật</th>
+                            <th rowspan="2" class="border border-slate-600 p-2 min-w-[140px]">Người Phụ Trách</th>
+                            <th rowspan="2" class="border border-slate-600 p-2 w-28 bg-amber-600 text-white font-extrabold text-xs">Effort (Giờ)</th>
+                            <th rowspan="2" class="border border-slate-600 p-2 w-10">Xóa</th>
+                        </tr>
+                        <!-- Header Row 2: Detailed Parameters -->
+                        <tr class="bg-slate-700 text-slate-200 font-semibold text-center border-b border-slate-600">
+                            <!-- CRUD -->
+                            <th class="border border-slate-600 p-1 w-14 bg-sky-950/60" title="Read">Read</th>
+                            <th class="border border-slate-600 p-1 w-14 bg-sky-950/60" title="Search">Search</th>
+                            <th class="border border-slate-600 p-1 w-14 bg-sky-950/60" title="Create">Create</th>
+                            <th class="border border-slate-600 p-1 w-14 bg-sky-950/60" title="Update">Update</th>
+                            <th class="border border-slate-600 p-1 w-14 bg-sky-950/60" title="Delete">Delete</th>
+                            <!-- Complexities -->
+                            <th class="border border-slate-600 p-1 w-28 bg-indigo-950/60">Độ phức tạp UI</th>
+                            <th class="border border-slate-600 p-1 w-28 bg-indigo-950/60">Số Bảng DB</th>
+                            <th class="border border-slate-600 p-1 w-20 bg-indigo-950/60" title="Job ngầm / Queue">Job ngầm</th>
+                            <th class="border border-slate-600 p-1 w-24 bg-indigo-950/60" title="API bên thứ 3">3rd Party API</th>
+                            <th class="border border-slate-600 p-1 w-24 bg-indigo-950/60" title="Media / Export Excel">Media/Export</th>
+                        </tr>
+                    </thead>
+                    <tbody id="editable-features-tbody">
+                        <!-- Dynamic Editable Matrix Rows -->
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-slate-100 font-bold text-slate-800">
+                            <td colspan="12" class="border border-slate-300 p-2.5 text-right uppercase">TỔNG NỖ LỰC DỰ ÁN (TOTAL EFFORT):</td>
+                            <td colspan="3" class="border border-slate-300 p-2.5 text-center font-black text-amber-700 text-sm bg-amber-50" id="table-grand-total">0.0 hrs</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 2: OVERVIEW & EDITABLE PARAMETER CONFIGURATION -->
+        <div id="tab-overview-content" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <!-- Left: Team Info -->
+            <section class="lg:col-span-5 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <div class="border-b border-slate-200 pb-3 mb-4 flex justify-between items-center">
+                    <h2 class="font-bold text-slate-700 flex items-center gap-2 text-sm md:text-base">
+                        <i data-lucide="users" class="w-5 h-5 text-teal-600"></i>
+                        Thông tin dự án & Thành viên
+                    </h2>
+                    <button onclick="resetDefaultData()" class="text-xs text-slate-500 hover:text-teal-600 flex items-center gap-1 transition">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Tải lại mặc định
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Tên dự án <span class="text-red-500">*</span></label>
+                        <input type="text" id="project-name" oninput="handleInputChange()" placeholder="VD: Website Bán Hàng & Quản Lý Kho Hàng" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Tên nhóm <span class="text-red-500">*</span></label>
+                        <input type="text" id="team-name" oninput="handleInputChange()" placeholder="VD: SE104.O12 - Nhóm 05" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Danh sách thành viên<span class="text-red-500">*</span></label>
+                        <div id="members-container" class="space-y-2">
+                            <!-- Members List -->
+                        </div>
+                        <button type="button" onclick="addMemberInput()" class="mt-2 text-xs font-medium text-teal-600 hover:text-teal-800 flex items-center gap-1">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Thêm thành viên
+                        </button>
+                    </div>
+
+                    <!-- Member Contribution Pie Chart -->
+                    <div class="mt-6 pt-4 border-t border-slate-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider">
+                                <i data-lucide="pie-chart" class="w-4 h-4 text-teal-600"></i>
+                                Tỷ lệ đóng góp theo thành viên
+                            </h3>
+                            <span id="chart-total-hrs" class="text-[11px] font-semibold text-slate-500">0 hrs</span>
+                        </div>
+                        <div class="relative w-full max-w-[280px] mx-auto h-[240px] flex items-center justify-center">
+                            <canvas id="memberContributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right: Editable Config Table Matrix -->
+            <section class="lg:col-span-7 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <div class="border-b border-slate-200 pb-3 mb-4 flex justify-between items-center">
+                    <div>
+                        <h2 class="font-bold text-slate-800 flex items-center gap-2 text-sm md:text-base">
+                            <i data-lucide="sliders" class="w-5 h-5 text-teal-600"></i>
+                            BẢNG CẤU HÌNH HỆ SỐ
+                        </h2>
+                        <p class="text-xs text-slate-500">Bạn có thể trực tiếp thay đổi trọng số bên dưới để tự động tính lại Effort</p>
+                    </div>
+                    <button onclick="resetDefaultWeights()" class="px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border font-medium flex items-center gap-1">
+                        <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Về mặc định
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-slate-300 text-xs">
+                        <thead>
+                            <tr class="bg-slate-800 text-white font-bold text-left">
+                                <th class="border border-slate-600 p-2">Tên hệ số</th>
+                                <th class="border border-slate-600 p-2 text-center w-24">Giá trị</th>
+                                <th class="border border-slate-600 p-2">Diễn giải đơn vị</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 text-slate-700">
+                            <tr><td class="p-1.5 border">Read (Xem chi tiết/danh sách)</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-w-read" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-teal-700 border-slate-300"></td><td class="p-1.5 border">Giờ cơ sở</td></tr>
+                            <tr><td class="p-1.5 border">Search / Filter (Lọc/Tìm kiếm)</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-w-search" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-teal-700 border-slate-300"></td><td class="p-1.5 border">Giờ cơ sở</td></tr>
+                            <tr><td class="p-1.5 border">Create (Thêm mới)</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-w-create" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-teal-700 border-slate-300"></td><td class="p-1.5 border">Giờ cơ sở</td></tr>
+                            <tr><td class="p-1.5 border">Update (Cập nhật/Sửa)</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-w-update" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-teal-700 border-slate-300"></td><td class="p-1.5 border">Giờ cơ sở</td></tr>
+                            <tr><td class="p-1.5 border">Delete (Xóa)</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-w-delete" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-teal-700 border-slate-300"></td><td class="p-1.5 border">Giờ cơ sở</td></tr>
+                            <tr class="bg-slate-50"><td class="p-1.5 border">UI Chuẩn (Form/Table đơn giản)</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-ui-std" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr class="bg-slate-50"><td class="p-1.5 border">UI Trung bình (Responsive/Modal/Wizard)</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-ui-med" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr class="bg-slate-50"><td class="p-1.5 border">UI Phức tạp (Dashboard/Chart/Drag-Drop)</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-ui-cmp" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr><td class="p-1.5 border">DB: 1 Bảng</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-db-1" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr><td class="p-1.5 border">DB: 2-3 Bảng</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-db-23" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr><td class="p-1.5 border">DB: 4-5 Bảng</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-db-45" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr><td class="p-1.5 border">DB: > 5 Bảng</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-db-gt5" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr class="bg-slate-50"><td class="p-1.5 border">Job ngầm / Queue / Socket</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-tech-job" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr class="bg-slate-50"><td class="p-1.5 border">Tích hợp API Bên thứ 3</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-tech-api" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr class="bg-slate-50"><td class="p-1.5 border">Upload / Xuất File Excel/PDF</td><td class="p-1 border text-center"><input type="number" step="0.1" id="cfg-tech-file" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-slate-800 border-slate-300"></td><td class="p-1.5 border">Hệ số nhân</td></tr>
+                            <tr class="bg-amber-50 font-bold"><td class="p-1.5 border">Hệ số Dự phòng Rủi ro (Buffering)</td><td class="p-1 border text-center"><input type="number" step="0.05" id="cfg-buffer" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-amber-700 border-amber-300"></td><td class="p-1.5 border">Dự phòng Rủi ro</td></tr>
+                            <tr class="bg-emerald-50"><td class="p-1.5 border">Số giờ làm việc / ngày</td><td class="p-1 border text-center"><input type="number" step="1" id="cfg-hours-per-day" oninput="handleParamChange()" class="w-16 px-1.5 py-0.5 border rounded text-center font-bold text-emerald-700 border-emerald-300"></td><td class="p-1.5 border">Giờ/Ngày công (ManDay)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 border border-slate-700">
+            <i id="toast-icon" data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+            <span id="toast-message" class="text-sm font-medium">Thông báo</span>
+        </div>
+    </div>
+
+    <script>
+        /* ----------------------------------------------------
+         * DEFAULT PARAMETERS & WEIGHTS (EDITABLE BY USER)
+         * ---------------------------------------------------- */
+        const DEFAULT_PARAMS = {
+            CRUD_WEIGHTS: { read: 1.0, search: 1.0, create: 1.5, update: 1.5, delete: 0.5 },
+            UI_MULTIPLIER: { std: 1.0, med: 1.2, cmp: 1.5 },
+            DB_MULTIPLIER: { db1: 1.0, db23: 1.3, db45: 1.6, dbgt5: 2.0 },
+            TECH_MULTIPLIER: { job: 1.4, api: 1.5, file: 1.2 },
+            BUFFER: 1.2,
+            HOURS_PER_DAY: 8
+        };
+
+        // Active Parameters in memory
+        let PARAMS = JSON.parse(JSON.stringify(DEFAULT_PARAMS));
+
+        // State Variables
+        let p2pChannel = null;
+        let peer = null;
+        let peerConnections = [];
+        let isUpdatingFromPeer = false;
+        let contributionChart = null;
+        let currentRoomId = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            
+            // Normalize Room ID from URL hash (strip -join suffix)
+            let rawHash = window.location.hash ? window.location.hash.substring(1) : '';
+            if (rawHash) {
+                currentRoomId = rawHash.replace('-join', '');
+            } else {
+                currentRoomId = 'room-' + Math.random().toString(36).substring(2, 9);
+                window.location.hash = currentRoomId;
+            }
+
+            initP2PAndBroadcast();
+
+            const saved = localStorage.getItem('v2_effort_matrix_doc');
+            if (saved) {
+                try {
+                    loadFormData(JSON.parse(saved));
+                } catch (e) {
+                    initDefaultSampleData();
+                }
+            } else {
+                initDefaultSampleData();
+            }
+        });
+
+        /* ----------------------------------------------------
+         * Tab Switcher
+         * ---------------------------------------------------- */
+        function switchTab(tab) {
+            const btnFeatures = document.getElementById('tab-btn-features');
+            const btnOverview = document.getElementById('tab-btn-overview');
+            const contentFeatures = document.getElementById('tab-features-content');
+            const contentOverview = document.getElementById('tab-overview-content');
+
+            if (tab === 'features') {
+                btnFeatures.className = "tab-btn active py-3 px-2 border-b-2 border-teal-600 text-teal-700 font-semibold text-sm flex items-center gap-2 transition";
+                btnOverview.className = "tab-btn py-3 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-700 font-semibold text-sm flex items-center gap-2 transition";
+                contentFeatures.classList.remove('hidden');
+                contentOverview.classList.add('hidden');
+            } else {
+                btnOverview.className = "tab-btn active py-3 px-2 border-b-2 border-teal-600 text-teal-700 font-semibold text-sm flex items-center gap-2 transition";
+                btnFeatures.className = "tab-btn py-3 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-700 font-semibold text-sm flex items-center gap-2 transition";
+                contentOverview.classList.remove('hidden');
+                contentFeatures.classList.add('hidden');
+            }
+        }
+
+        /* ----------------------------------------------------
+         * Parameter Config UI Handlers
+         * ---------------------------------------------------- */
+        function readParamsFromUI() {
+            return {
+                CRUD_WEIGHTS: {
+                    read: parseFloat(document.getElementById('cfg-w-read').value) || 0,
+                    search: parseFloat(document.getElementById('cfg-w-search').value) || 0,
+                    create: parseFloat(document.getElementById('cfg-w-create').value) || 0,
+                    update: parseFloat(document.getElementById('cfg-w-update').value) || 0,
+                    delete: parseFloat(document.getElementById('cfg-w-delete').value) || 0
+                },
+                UI_MULTIPLIER: {
+                    std: parseFloat(document.getElementById('cfg-ui-std').value) || 1,
+                    med: parseFloat(document.getElementById('cfg-ui-med').value) || 1,
+                    cmp: parseFloat(document.getElementById('cfg-ui-cmp').value) || 1
+                },
+                DB_MULTIPLIER: {
+                    db1: parseFloat(document.getElementById('cfg-db-1').value) || 1,
+                    db23: parseFloat(document.getElementById('cfg-db-23').value) || 1,
+                    db45: parseFloat(document.getElementById('cfg-db-45').value) || 1,
+                    dbgt5: parseFloat(document.getElementById('cfg-db-gt5').value) || 1
+                },
+                TECH_MULTIPLIER: {
+                    job: parseFloat(document.getElementById('cfg-tech-job').value) || 1,
+                    api: parseFloat(document.getElementById('cfg-tech-api').value) || 1,
+                    file: parseFloat(document.getElementById('cfg-tech-file').value) || 1
+                },
+                BUFFER: parseFloat(document.getElementById('cfg-buffer').value) || 1,
+                HOURS_PER_DAY: parseFloat(document.getElementById('cfg-hours-per-day').value) || 8
+            };
+        }
+
+        function writeParamsToUI(params) {
+            document.getElementById('cfg-w-read').value = params.CRUD_WEIGHTS.read;
+            document.getElementById('cfg-w-search').value = params.CRUD_WEIGHTS.search;
+            document.getElementById('cfg-w-create').value = params.CRUD_WEIGHTS.create;
+            document.getElementById('cfg-w-update').value = params.CRUD_WEIGHTS.update;
+            document.getElementById('cfg-w-delete').value = params.CRUD_WEIGHTS.delete;
+
+            document.getElementById('cfg-ui-std').value = params.UI_MULTIPLIER.std;
+            document.getElementById('cfg-ui-med').value = params.UI_MULTIPLIER.med;
+            document.getElementById('cfg-ui-cmp').value = params.UI_MULTIPLIER.cmp;
+
+            document.getElementById('cfg-db-1').value = params.DB_MULTIPLIER.db1;
+            document.getElementById('cfg-db-23').value = params.DB_MULTIPLIER.db23;
+            document.getElementById('cfg-db-45').value = params.DB_MULTIPLIER.db45;
+            document.getElementById('cfg-db-gt5').value = params.DB_MULTIPLIER.dbgt5;
+
+            document.getElementById('cfg-tech-job').value = params.TECH_MULTIPLIER.job;
+            document.getElementById('cfg-tech-api').value = params.TECH_MULTIPLIER.api;
+            document.getElementById('cfg-tech-file').value = params.TECH_MULTIPLIER.file;
+
+            document.getElementById('cfg-buffer').value = params.BUFFER;
+            document.getElementById('cfg-hours-per-day').value = params.HOURS_PER_DAY;
+        }
+
+        function handleParamChange() {
+            PARAMS = readParamsFromUI();
+            handleInputChange();
+        }
+
+        function resetDefaultWeights() {
+            PARAMS = JSON.parse(JSON.stringify(DEFAULT_PARAMS));
+            writeParamsToUI(PARAMS);
+            handleInputChange();
+            showToast("Đã khôi phục bảng trọng số chuẩn!");
+        }
+
+        /* ----------------------------------------------------
+         * Computation Engine
+         * ---------------------------------------------------- */
+        function computeRowEffort(row) {
+            // 1. Base CRUD Hours
+            let baseHours = 0;
+            if (row.crudRead) baseHours += PARAMS.CRUD_WEIGHTS.read;
+            if (row.crudSearch) baseHours += PARAMS.CRUD_WEIGHTS.search;
+            if (row.crudCreate) baseHours += PARAMS.CRUD_WEIGHTS.create;
+            if (row.crudUpdate) baseHours += PARAMS.CRUD_WEIGHTS.update;
+            if (row.crudDelete) baseHours += PARAMS.CRUD_WEIGHTS.delete;
+
+            // 2. Multipliers
+            const mUI = PARAMS.UI_MULTIPLIER[row.uiComplexity] || 1.0;
+            const mDB = PARAMS.DB_MULTIPLIER[row.dbTables] || 1.0;
+            const mJob = row.hasJob ? PARAMS.TECH_MULTIPLIER.job : 1.0;
+            const mAPI = row.hasApi ? PARAMS.TECH_MULTIPLIER.api : 1.0;
+            const mFile = row.hasFile ? PARAMS.TECH_MULTIPLIER.file : 1.0;
+
+            const totalMultiplier = mUI * mDB * mJob * mAPI * mFile;
+
+            // 3. Final Effort with Buffer
+            const effort = baseHours * totalMultiplier * PARAMS.BUFFER;
+            return Math.round(effort * 10) / 10;
+        }
+
+        /* ----------------------------------------------------
+         * Data Model Processing
+         * ---------------------------------------------------- */
+        function getFormData() {
+            const projectName = document.getElementById('project-name').value;
+            const teamName = document.getElementById('team-name').value;
+
+            // Members
+            const memberInputs = document.querySelectorAll('.member-input');
+            const members = Array.from(memberInputs).map(i => i.value).filter(v => v.trim() !== '');
+
+            // Matrix Features
+            const rows = document.querySelectorAll('.feature-table-row');
+            const features = [];
+
+            rows.forEach(row => {
+                features.push({
+                    name: row.querySelector('.row-name').value,
+                    crudRead: row.querySelector('.row-read').checked,
+                    crudSearch: row.querySelector('.row-search').checked,
+                    crudCreate: row.querySelector('.row-create').checked,
+                    crudUpdate: row.querySelector('.row-update').checked,
+                    crudDelete: row.querySelector('.row-delete').checked,
+                    uiComplexity: row.querySelector('.row-ui').value,
+                    dbTables: row.querySelector('.row-db').value,
+                    hasJob: row.querySelector('.row-job').checked,
+                    hasApi: row.querySelector('.row-api').checked,
+                    hasFile: row.querySelector('.row-file').checked,
+                    assignee: row.querySelector('.row-assignee').value
+                });
+            });
+
+            return { projectName, teamName, members, features, params: PARAMS };
+        }
+
+        function loadFormData(data) {
+            if (!data) return;
+
+            document.getElementById('project-name').value = data.projectName || '';
+            document.getElementById('team-name').value = data.teamName || '';
+
+            // Load Custom Weights
+            if (data.params) {
+                PARAMS = data.params;
+            } else {
+                PARAMS = JSON.parse(JSON.stringify(DEFAULT_PARAMS));
+            }
+            writeParamsToUI(PARAMS);
+
+            // Members (Tắt triggerSync để tránh gửi ngược gói tin P2P)
+            const membersContainer = document.getElementById('members-container');
+            membersContainer.innerHTML = '';
+            const members = (data.members && data.members.length > 0) ? data.members : [''];
+            members.forEach(m => addMemberInput(m, false));
+
+            // Features Table (Tắt triggerSync để tránh gửi ngược gói tin P2P)
+            const tbody = document.getElementById('editable-features-tbody');
+            tbody.innerHTML = '';
+            if (data.features && data.features.length > 0) {
+                data.features.forEach(f => addFeatureRow(f, false));
+            } else {
+                addFeatureRow(null, false);
+            }
+
+            updateAllAssigneeDropdowns();
+            recalculateAll(data);
+        }
+
+        /* ----------------------------------------------------
+         * Dynamic Form & Matrix Table Handlers
+         * ---------------------------------------------------- */
+        function addMemberInput(value = '', triggerSync = true) {
+            const container = document.getElementById('members-container');
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 member-row';
+            div.innerHTML = `
+                <input type="text" value="${value}" oninput="handleMemberNameChange()" placeholder="VD: Nguyễn Văn A" class="member-input flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+                <button type="button" onclick="removeMemberInput(this)" class="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            `;
+            container.appendChild(div);
+            lucide.createIcons();
+
+            if (triggerSync) {
+                handleMemberNameChange();
+            }
+        }
+
+        function removeMemberInput(btn) {
+            const container = document.getElementById('members-container');
+            if (container.children.length > 1) {
+                btn.closest('.member-row').remove();
+                handleMemberNameChange();
+            } else {
+                showToast("Dự án cần ít nhất 1 thành viên!");
+            }
+        }
+
+        function handleMemberNameChange() {
+            updateAllAssigneeDropdowns();
+            handleInputChange();
+        }
+
+        function getMemberList() {
+            const inputs = document.querySelectorAll('.member-input');
+            return Array.from(inputs).map(i => i.value.trim()).filter(v => v !== '');
+        }
+
+        function updateAllAssigneeDropdowns() {
+            const members = getMemberList();
+            const selects = document.querySelectorAll('.row-assignee');
+
+            selects.forEach(select => {
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">-- Chọn thành viên --</option>';
+                members.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = m;
+                    select.appendChild(opt);
+                });
+                select.value = currentVal;
+            });
+
+            updateContributionChart();
+        }
+
+        function addFeatureRow(data = null, triggerSync = true) {
+            const tbody = document.getElementById('editable-features-tbody');
+            const rowCount = tbody.children.length + 1;
+
+            const row = document.createElement('tr');
+            row.className = 'feature-table-row border-b border-slate-200 hover:bg-slate-50 transition';
+
+            const defaultData = data || {
+                name: '',
+                crudRead: true,
+                crudSearch: false,
+                crudCreate: false,
+                crudUpdate: false,
+                crudDelete: false,
+                uiComplexity: 'std',
+                dbTables: 'db1',
+                hasJob: false,
+                hasApi: false,
+                hasFile: false,
+                assignee: ''
+            };
+
+            row.innerHTML = `
+                <td class="border border-slate-300 p-2 text-center font-bold text-slate-500 row-stt">${rowCount}</td>
+                <td class="border border-slate-300 p-1">
+                    <input type="text" value="${defaultData.name}" oninput="handleInputChange()" placeholder="Tên chức năng..." class="row-name w-full px-2 py-1 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-teal-500 outline-none">
+                </td>
+                <td class="border border-slate-300 p-1 text-center bg-sky-50/50"><input type="checkbox" ${defaultData.crudRead ? 'checked' : ''} onchange="handleInputChange()" class="row-read w-4 h-4 accent-teal-600 cursor-pointer"></td>
+                <td class="border border-slate-300 p-1 text-center bg-sky-50/50"><input type="checkbox" ${defaultData.crudSearch ? 'checked' : ''} onchange="handleInputChange()" class="row-search w-4 h-4 accent-teal-600 cursor-pointer"></td>
+                <td class="border border-slate-300 p-1 text-center bg-sky-50/50"><input type="checkbox" ${defaultData.crudCreate ? 'checked' : ''} onchange="handleInputChange()" class="row-create w-4 h-4 accent-teal-600 cursor-pointer"></td>
+                <td class="border border-slate-300 p-1 text-center bg-sky-50/50"><input type="checkbox" ${defaultData.crudUpdate ? 'checked' : ''} onchange="handleInputChange()" class="row-update w-4 h-4 accent-teal-600 cursor-pointer"></td>
+                <td class="border border-slate-300 p-1 text-center bg-sky-50/50"><input type="checkbox" ${defaultData.crudDelete ? 'checked' : ''} onchange="handleInputChange()" class="row-delete w-4 h-4 accent-teal-600 cursor-pointer"></td>
+                
+                <td class="border border-slate-300 p-1 bg-indigo-50/50">
+                    <select onchange="handleInputChange()" class="row-ui w-full px-1 py-1 border border-slate-200 rounded text-xs bg-white focus:ring-1 focus:ring-teal-500 outline-none">
+                        <option value="std" ${defaultData.uiComplexity === 'std' ? 'selected' : ''}>Chuẩn (1.0)</option>
+                        <option value="med" ${defaultData.uiComplexity === 'med' ? 'selected' : ''}>Trung bình (1.2)</option>
+                        <option value="cmp" ${defaultData.uiComplexity === 'cmp' ? 'selected' : ''}>Phức tạp (1.5)</option>
+                    </select>
+                </td>
+                <td class="border border-slate-300 p-1 bg-indigo-50/50">
+                    <select onchange="handleInputChange()" class="row-db w-full px-1 py-1 border border-slate-200 rounded text-xs bg-white focus:ring-1 focus:ring-teal-500 outline-none">
+                        <option value="db1" ${defaultData.dbTables === 'db1' ? 'selected' : ''}>1 Bảng (1.0)</option>
+                        <option value="db23" ${defaultData.dbTables === 'db23' ? 'selected' : ''}>2-3 Bảng (1.3)</option>
+                        <option value="db45" ${defaultData.dbTables === 'db45' ? 'selected' : ''}>4-5 Bảng (1.6)</option>
+                        <option value="dbgt5" ${defaultData.dbTables === 'dbgt5' ? 'selected' : ''}>> 5 Bảng (2.0)</option>
+                    </select>
+                </td>
+                <td class="border border-slate-300 p-1 text-center bg-indigo-50/50"><input type="checkbox" ${defaultData.hasJob ? 'checked' : ''} onchange="handleInputChange()" class="row-job w-4 h-4 accent-teal-600 cursor-pointer"></td>
+                <td class="border border-slate-300 p-1 text-center bg-indigo-50/50"><input type="checkbox" ${defaultData.hasApi ? 'checked' : ''} onchange="handleInputChange()" class="row-api w-4 h-4 accent-teal-600 cursor-pointer"></td>
+                <td class="border border-slate-300 p-1 text-center bg-indigo-50/50"><input type="checkbox" ${defaultData.hasFile ? 'checked' : ''} onchange="handleInputChange()" class="row-file w-4 h-4 accent-teal-600 cursor-pointer"></td>
+
+                <td class="border border-slate-300 p-1">
+                    <select onchange="handleAssigneeChange()" class="row-assignee w-full px-1 py-1 border border-slate-200 rounded text-xs bg-white focus:ring-1 focus:ring-teal-500 outline-none">
+                        <option value="">-- Chọn thành viên --</option>
+                    </select>
+                </td>
+                <td class="border border-slate-300 p-2 text-center font-bold text-amber-700 bg-amber-50/60 row-effort">0.0</td>
+                <td class="border border-slate-300 p-1 text-center">
+                    <button type="button" onclick="removeFeatureRow(this)" class="p-1 text-slate-400 hover:text-red-500 rounded transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </td>
+            `;
+
+            tbody.appendChild(row);
+            lucide.createIcons();
+            updateAllAssigneeDropdowns();
+            
+            if (data && data.assignee) {
+                row.querySelector('.row-assignee').value = data.assignee;
+            }
+
+            if (triggerSync) {
+                handleInputChange();
+            }
+        }
+
+        function removeFeatureRow(btn) {
+            const tbody = document.getElementById('editable-features-tbody');
+            if (tbody.children.length > 1) {
+                btn.closest('tr').remove();
+                reindexRows();
+                handleInputChange();
+            } else {
+                showToast("Bảng cần có ít nhất 1 chức năng!");
+            }
+        }
+
+        function reindexRows() {
+            const rows = document.querySelectorAll('.feature-table-row');
+            rows.forEach((r, index) => {
+                r.querySelector('.row-stt').textContent = index + 1;
+            });
+        }
+
+        function handleAssigneeChange() {
+            updateContributionChart();
+            handleInputChange();
+        }
+
+        function recalculateAll(data = null) {
+            const rows = document.querySelectorAll('.feature-table-row');
+            let totalEffort = 0;
+
+            rows.forEach(row => {
+                const rowObj = {
+                    crudRead: row.querySelector('.row-read').checked,
+                    crudSearch: row.querySelector('.row-search').checked,
+                    crudCreate: row.querySelector('.row-create').checked,
+                    crudUpdate: row.querySelector('.row-update').checked,
+                    crudDelete: row.querySelector('.row-delete').checked,
+                    uiComplexity: row.querySelector('.row-ui').value,
+                    dbTables: row.querySelector('.row-db').value,
+                    hasJob: row.querySelector('.row-job').checked,
+                    hasApi: row.querySelector('.row-api').checked,
+                    hasFile: row.querySelector('.row-file').checked
+                };
+
+                const effort = computeRowEffort(rowObj);
+                row.querySelector('.row-effort').textContent = effort.toFixed(1);
+                totalEffort += effort;
+            });
+
+            totalEffort = Math.round(totalEffort * 10) / 10;
+            const personDays = Math.round((totalEffort / PARAMS.HOURS_PER_DAY) * 10) / 10;
+
+            document.getElementById('kpi-total-hours').textContent = totalEffort;
+            document.getElementById('kpi-person-days').textContent = personDays;
+            document.getElementById('table-grand-total').textContent = totalEffort.toFixed(1) + ' hrs';
+
+            updateContributionChart();
+        }
+
+        function handleInputChange() {
+            recalculateAll();
+
+            // Nếu đang trong quá trình nạp dữ liệu P2P thì tuyệt đối không bắn dữ liệu ngược lại
+            if (isUpdatingFromPeer) return;
+
+            const currentData = getFormData();
+            localStorage.setItem('v2_effort_matrix_doc', JSON.stringify(currentData));
+
+            // 1. Sync via BroadcastChannel (Same Device Multi-Tab)
+            if (p2pChannel) {
+                try {
+                    p2pChannel.postMessage({ type: 'SYNC_DATA', payload: currentData });
+                } catch(e){}
+            }
+
+            // 2. Sync via PeerJS WebRTC Connections (Cross Device P2P)
+            peerConnections.forEach(conn => {
+                if (conn && conn.open) {
+                    try {
+                        conn.send({ type: 'SYNC_DATA', payload: currentData });
+                    } catch (e) {
+                        console.error("Peer send error", e);
+                    }
+                }
+            });
+        }
+
+        /* ----------------------------------------------------
+         * Member Contribution Chart (Chart.js)
+         * ---------------------------------------------------- */
+        function updateContributionChart() {
+            const members = getMemberList();
+            const rows = document.querySelectorAll('.feature-table-row');
+
+            const memberEffortMap = {};
+            members.forEach(m => memberEffortMap[m] = 0);
+            memberEffortMap['Chưa phân công'] = 0;
+
+            let totalEffort = 0;
+
+            rows.forEach(row => {
+                const effort = parseFloat(row.querySelector('.row-effort').textContent) || 0;
+                const assignee = row.querySelector('.row-assignee').value || 'Chưa phân công';
+                
+                if (memberEffortMap.hasOwnProperty(assignee)) {
+                    memberEffortMap[assignee] += effort;
+                } else {
+                    memberEffortMap['Chưa phân công'] += effort;
+                }
+                totalEffort += effort;
+            });
+
+            document.getElementById('chart-total-hrs').textContent = totalEffort.toFixed(1) + ' hrs';
+
+            const labels = [];
+            const dataValues = [];
+            const backgroundColors = [
+                '#0d9488', '#0284c7', '#6366f1', '#8b5cf6', 
+                '#ec4899', '#f59e0b', '#10b981', '#64748b'
+            ];
+
+            Object.keys(memberEffortMap).forEach(key => {
+                if (memberEffortMap[key] > 0 || key !== 'Chưa phân công') {
+                    labels.push(key);
+                    dataValues.push(Math.round(memberEffortMap[key] * 10) / 10);
+                }
+            });
+
+            const ctx = document.getElementById('memberContributionChart');
+            if (!ctx) return;
+
+            if (contributionChart) {
+                contributionChart.data.labels = labels;
+                contributionChart.data.datasets[0].data = dataValues;
+                contributionChart.update();
+            } else {
+                contributionChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: dataValues,
+                            backgroundColor: backgroundColors,
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 12,
+                                    font: { size: 10 }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        /* ----------------------------------------------------
+         * Sample Data Initializer
+         * ---------------------------------------------------- */
+        function initDefaultSampleData() {
+            const sampleData = {
+                projectName: "Website Bán Hàng & Quản Lý Kho Hàng",
+                teamName: "Nhóm PTPM",
+                members: ["Nguyễn Văn A", "Trần Thị B", "Lê Văn C", "Pham Văn D", "Vũ Thị E"],
+                params: DEFAULT_PARAMS,
+                features: [
+                    { name: "Quản lý Danh mục Sản phẩm", crudRead: true, crudSearch: true, crudCreate: true, crudUpdate: true, crudDelete: true, uiComplexity: "std", dbTables: "db1", hasJob: false, hasApi: false, hasFile: false, assignee: "Nguyễn Văn A" },
+                    { name: "Danh sách Sản phẩm & Lọc nâng cao", crudRead: true, crudSearch: true, crudCreate: false, crudUpdate: false, crudDelete: false, uiComplexity: "med", dbTables: "db23", hasJob: false, hasApi: false, hasFile: true, assignee: "Trần Thị B" },
+                    { name: "Đặt hàng & Thanh toán VNPAY", crudRead: true, crudSearch: false, crudCreate: true, crudUpdate: true, crudDelete: false, uiComplexity: "cmp", dbTables: "db45", hasJob: false, hasApi: true, hasFile: false, assignee: "Lê Văn C" },
+                    { name: "Báo cáo Doanh thu & Export Excel", crudRead: true, crudSearch: true, crudCreate: false, crudUpdate: false, crudDelete: false, uiComplexity: "cmp", dbTables: "dbgt5", hasJob: true, hasApi: false, hasFile: true, assignee: "Pham Văn D" },
+                    { name: "Đánh giá & Bình luận sản phẩm", crudRead: true, crudSearch: true, crudCreate: true, crudUpdate: false, crudDelete: true, uiComplexity: "std", dbTables: "db1", hasJob: false, hasApi: false, hasFile: true, assignee: "Vũ Thị E" }
+                ]
+            };
+            loadFormData(sampleData);
+        }
+
+        function resetDefaultData() {
+            if (confirm("Bạn có chắc chắn muốn tải lại dữ liệu mẫu ban đầu?")) {
+                initDefaultSampleData();
+                showToast("Đã làm mới về dữ liệu mẫu!");
+            }
+        }
+
+        /* ----------------------------------------------------
+         * P2P & BroadcastChannel Engine (ROBUST & FIXED)
+         * ---------------------------------------------------- */
+        let isHost = true; // Flaged to control sync direction on initialization
+
+        function initP2PAndBroadcast() {
+            isHost = !window.location.hash.includes('-join');
+
+            // Local Multi-tab Sync via BroadcastChannel
+            if ('BroadcastChannel' in window) {
+                p2pChannel = new BroadcastChannel('v2_effort_matrix_channel_' + currentRoomId);
+                p2pChannel.onmessage = (e) => {
+                    if (!e.data) return;
+                    
+                    if (e.data.type === 'SYNC_DATA' && !isUpdatingFromPeer) {
+                        applyPeerUpdate(e.data.payload);
+                    } else if (e.data.type === 'REQUEST_STATE' && isHost) {
+                        // Chỉ Host mới được trả lời State dữ liệu cho tab/máy vừa join
+                        p2pChannel.postMessage({ type: 'SYNC_DATA', payload: getFormData() });
+                    }
+                };
+
+                // Nếu là Guest (Joiner) mới vào tab, chủ động yêu cầu Host gửi State về
+                if (!isHost) {
+                    setTimeout(() => {
+                        p2pChannel.postMessage({ type: 'REQUEST_STATE' });
+                    }, 300);
+                }
+            }
+
+            // Suppress uncaught WebSocket errors in sandbox
+            window.addEventListener('unhandledrejection', function(event) {
+                if (event.reason && (event.reason.name === 'SecurityError' || (event.reason.message && event.reason.message.includes('WebSocket')))) {
+                    event.preventDefault();
+                }
+            });
+
+            // Initialize PeerJS with fallback
+            try {
+                const hostPeerId = 'effort-room-' + currentRoomId;
+
+                peer = new Peer(isHost ? hostPeerId : null, { debug: 0 });
+
+                peer.on('open', (id) => {
+                    updateP2PStatus(true, isHost ? "Phòng P2P (Chủ)" : "Phòng P2P (Thành viên)");
+
+                    // If client joined room, connect to host
+                    if (!isHost) {
+                        connectToHost(hostPeerId);
+                    }
+                });
+
+                peer.on('connection', (conn) => {
+                    registerPeerConnection(conn);
+                });
+
+                peer.on('error', (err) => {
+                    if (err.type === 'unavailable-id') {
+                        // Host ID đã tồn tại -> Chuyển thành Guest và kết nối tới Host
+                        isHost = false;
+                        peer = new Peer(null, { debug: 0 });
+                        peer.on('open', () => {
+                            connectToHost(hostPeerId);
+                        });
+                    } else {
+                        updateP2PStatus(true, "Tab Sync (Online)");
+                    }
+                });
+            } catch (err) {
+                updateP2PStatus(true, "Tab Sync (Local)");
+            }
+        }
+
+        function connectToHost(hostId) {
+            if (!peer) return;
+            const conn = peer.connect(hostId, { reliable: true });
+            registerPeerConnection(conn);
+        }
+
+        function registerPeerConnection(conn) {
+            // Tránh lưu lặp connection
+            if (!peerConnections.some(c => c.peer === conn.peer)) {
+                peerConnections.push(conn);
+            }
+
+            conn.on('open', () => {
+                updateP2PStatus(true, "P2P Đã Kết Nối");
+                
+                if (isHost) {
+                    // Nếu là Host: Gửi ngay dữ liệu chuẩn của Host sang cho máy mới join
+                    conn.send({ type: 'SYNC_DATA', payload: getFormData() });
+                } else {
+                    // Nếu là Guest (Joiner): Chủ động gửi lệnh yêu cầu Host gửi dữ liệu sang
+                    conn.send({ type: 'REQUEST_STATE' });
+                }
+            });
+
+            conn.on('data', (data) => {
+                if (!data) return;
+                
+                if (data.type === 'SYNC_DATA') {
+                    applyPeerUpdate(data.payload);
+                } else if (data.type === 'REQUEST_STATE' && isHost) {
+                    // Chỉ Host nhận được yêu cầu mới phản hồi State chuẩn của Host
+                    conn.send({ type: 'SYNC_DATA', payload: getFormData() });
+                }
+            });
+
+            conn.on('close', () => {
+                peerConnections = peerConnections.filter(c => c !== conn);
+                if (peerConnections.length === 0) {
+                    updateP2PStatus(true, "Tab Sync");
+                }
+            });
+        }
+
+        function updateP2PStatus(isOnline, text) {
+            const statusDot = document.getElementById('connection-status-dot');
+            const statusText = document.getElementById('connection-status-text');
+            if (statusDot && statusText) {
+                statusDot.className = `w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`;
+                statusText.textContent = text;
+            }
+        }
+
+        function applyPeerUpdate(data) {
+            if (!data || isUpdatingFromPeer) return;
+            isUpdatingFromPeer = true;
+            try {
+                loadFormData(data);
+            } catch(e) {
+                console.error("Error applying P2P update", e);
+            } finally {
+                // Đảm bảo cờ khóa ngắt truyền đệ quy luôn được mở lại sau khi render hoàn tất
+                setTimeout(() => {
+                    isUpdatingFromPeer = false;
+                }, 100);
+            }
+        }
+
+        function copyShareLink() {
+            // Generates a room join link
+            const joinUrl = window.location.origin + window.location.pathname + '#' + currentRoomId + '-join';
+            
+            const dummy = document.createElement('input');
+            document.body.appendChild(dummy);
+            dummy.value = joinUrl;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+            showToast("Đã sao chép Link phòng P2P! Gửi link này cho bạn cùng nhóm để cùng chỉnh sửa.");
+        }
+
+        /* ----------------------------------------------------
+         * Backup & Restore JSON Functions
+         * ---------------------------------------------------- */
+        function exportToJSON() {
+            const data = getFormData();
+            const jsonStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const fileName = `Effort_Estimation_${(data.projectName || 'Project').replace(/\s+/g, '_')}.json`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showToast("Đã sao lưu file JSON thành công!");
+        }
+
+        function importFromJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data && (data.projectName !== undefined || data.features !== undefined)) {
+                        loadFormData(data);
+                        handleInputChange();
+                        showToast("Đã khôi phục dữ liệu từ JSON!");
+                    } else {
+                        showToast("Cấu trúc file JSON không hợp lệ!");
+                    }
+                } catch (err) {
+                    showToast("Lỗi đọc file JSON!");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        /* ----------------------------------------------------
+         * Export Excel (.xlsx) Engine via SheetJS
+         * ---------------------------------------------------- */
+        function exportToExcel() {
+            const data = getFormData();
+
+            // Worksheet 1: Summary & Team Info
+            const ws1Data = [
+                ["THÔNG TIN ƯỚC LƯỢNG NỖ LỰC DỰ ÁN (EFFORT ESTIMATION)"],
+                [""],
+                ["Tên Dự Án:", data.projectName],
+                ["Mã Lớp / Tên Nhóm:", data.teamName],
+                ["Tổng Effort Dự Án (Giờ):", document.getElementById('kpi-total-hours').textContent + " hrs"],
+                ["Tổng Quy Đổi (Person-Days):", document.getElementById('kpi-person-days').textContent + " ManDays"],
+                [""],
+                ["DANH SÁCH THÀNH VIÊN DỰ ÁN:"],
+                ...data.members.map((m, i) => [i + 1, m])
+            ];
+            const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
+
+            // Worksheet 2: Detailed Matrix
+            const ws2Header = [
+                ["STT", "Tên Usecase / Chức năng", "Read", "Search", "Create", "Update", "Delete", "Độ Phức Tạp UI", "Số Bảng DB", "Job Ngầm", "3rd Party API", "Media/Export", "Người Phụ Trách", "Effort Chốt (Giờ)"]
+            ];
+
+            const ws2Rows = data.features.map((f, idx) => {
+                const rowObj = {
+                    crudRead: f.crudRead, crudSearch: f.crudSearch, crudCreate: f.crudCreate, crudUpdate: f.crudUpdate, crudDelete: f.crudDelete,
+                    uiComplexity: f.uiComplexity, dbTables: f.dbTables, hasJob: f.hasJob, hasApi: f.hasApi, hasFile: f.hasFile
+                };
+                const effort = computeRowEffort(rowObj);
+                return [
+                    idx + 1,
+                    f.name,
+                    f.crudRead ? "TRUE" : "FALSE",
+                    f.crudSearch ? "TRUE" : "FALSE",
+                    f.crudCreate ? "TRUE" : "FALSE",
+                    f.crudUpdate ? "TRUE" : "FALSE",
+                    f.crudDelete ? "TRUE" : "FALSE",
+                    f.uiComplexity === 'std' ? 'Chuẩn' : (f.uiComplexity === 'med' ? 'Trung bình' : 'Phức tạp'),
+                    f.dbTables === 'db1' ? '1 Bảng' : (f.dbTables === 'db23' ? '2-3 Bảng' : (f.dbTables === 'db45' ? '4-5 Bảng' : '> 5 Bảng')),
+                    f.hasJob ? "TRUE" : "FALSE",
+                    f.hasApi ? "TRUE" : "FALSE",
+                    f.hasFile ? "TRUE" : "FALSE",
+                    f.assignee || "Chưa phân công",
+                    effort
+                ];
+            });
+
+            const ws2 = XLSX.utils.aoa_to_sheet([...ws2Header, ...ws2Rows]);
+
+            // Workbook creation
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws1, "Tong_Quan");
+            XLSX.utils.book_append_sheet(wb, ws2, "Uoc_Luong_Chi_Tiet");
+
+            const fileName = `Effort_Estimation_${(data.projectName || 'Student').replace(/\s+/g, '_')}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+
+            showToast("Đã xuất file Excel (.xlsx) thành công!");
+        }
+
+        /* ----------------------------------------------------
+         * Toast Helper
+         * ---------------------------------------------------- */
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            toastMsg.textContent = message;
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

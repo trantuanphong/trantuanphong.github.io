@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Problem Statement Generator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PeerJS for WebRTC P2P -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- docx.js UMD bundle for browser export -->
+    <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for preview */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header / Navbar -->
+    <header class="bg-indigo-700 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white/10 p-2 rounded-lg">
+                    <i data-lucide="file-text" class="w-6 h-6 text-indigo-200"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">ĐỊNH HƯỚNG DỰ ÁN</h1>
+                    <p class="text-xs text-indigo-200">Công cụ tổng hợp vấn đề, nỗi đau và giải pháp đề xuất</p>
+                </div>
+            </div>
+
+            <!-- Action Controls & P2P Status -->
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- P2P Room Joiner -->
+                <div class="flex items-center bg-indigo-800/80 rounded-lg p-1 border border-indigo-500/30">
+                    <div class="flex items-center px-2 text-xs text-indigo-200 gap-1.5">
+                        <span id="connection-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="connection-status-text" class="font-medium">Tab Sync</span>
+                    </div>
+                    <button onclick="copyShareLink()" class="px-2.5 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded font-medium transition flex items-center gap-1">
+                        <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+                        Chia sẻ
+                    </button>
+                </div>
+
+                <!-- Export Docx Button -->
+                <button onclick="exportToDocx()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-sm shadow transition flex items-center gap-2">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Xuất File DOCX
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Left Panel: Input Form -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+            <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <h2 class="font-semibold text-slate-700 flex items-center gap-2">
+                    <i data-lucide="edit-3" class="w-5 h-5 text-indigo-600"></i>
+                    Nhập Thông Tin Định Hướng
+                </h2>
+                <button onclick="resetDefaultData()" class="text-xs text-slate-500 hover:text-indigo-600 flex items-center gap-1 transition">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                    Tải dữ liệu mẫu
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
+                
+                <!-- 1. Thông Tin Chung -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs">1</span>
+                        Thông tin chung
+                    </h3>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Tên dự án <span class="text-red-500">*</span></label>
+                        <input type="text" id="project-name" oninput="handleInputChange()" placeholder="VD: Hệ thống Quản lý Bán hàng & Tồn kho FashionStore" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Tên nhóm<span class="text-red-500">*</span></label>
+                        <input type="text" id="team-name" oninput="handleInputChange()" placeholder="VD: Nhóm PTPM" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-sm font-medium text-slate-700">Danh sách thành viên<span class="text-red-500">*</span></label>
+                            <span class="text-xs text-slate-400"></span>
+                        </div>
+                        <div id="members-container" class="space-y-2">
+                            <!-- Dynamic Members Inputs -->
+                        </div>
+                        <button type="button" onclick="addMemberInput()" class="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Thêm thành viên
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. Phát Biểu Vấn Đề (Problem Statement) -->
+                <div class="space-y-4 pt-2">
+                    <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs">2</span>
+                        Phát biểu vấn đề
+                    </h3>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            Dành cho <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="target-user" oninput="validateAndHandleUserTarget(this)" placeholder="VD: chủ cửa hàng thời trang vừa và nhỏ" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm">
+                        <p id="target-user-error" class="hidden text-xs text-red-500 mt-1 flex items-center gap-1">
+                            <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                            Chỉ cho phép 1 đối tượng duy nhất, chỉ chứa chữ cái và khoảng trắng ([A-Za-z\s]).
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 3. Nỗi Đau, Nguyên Nhân, Hậu Quả & Giải Pháp -->
+                <div class="space-y-4 pt-2">
+                    <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs">3</span>
+                        Nỗi đau & Giải pháp
+                    </h3>
+
+                    <div id="pain-points-container" class="space-y-6">
+                        <!-- Dynamic Pain Points -->
+                    </div>
+
+                    <button type="button" onclick="addPainPointBlock()" class="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition">
+                        <i data-lucide="plus" class="w-4 h-4"></i> Thêm nỗi đau mới
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Right Panel: Live Document Preview -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+            <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <h2 class="font-semibold text-slate-700 flex items-center gap-2">
+                    <i data-lucide="eye" class="w-5 h-5 text-indigo-600"></i>
+                    Xem trước tài liệu
+                </h2>
+                <span class="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-full font-medium">Real-time</span>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 bg-slate-100 custom-scrollbar">
+                <!-- A4 Document Paper Simulation -->
+                <div id="document-preview" class="bg-white shadow-md rounded border border-slate-200 p-8 max-w-2xl mx-auto min-h-[600px] text-slate-900 text-sm leading-relaxed">
+                    
+                    <h2 class="text-center font-bold text-lg uppercase mb-6 tracking-wide text-slate-900">
+                        BẢN ĐỊNH HƯỚNG DỰ ÁN
+                    </h2>
+
+                    <!-- 1. THÔNG TIN CHUNG DỰ ÁN -->
+                    <div class="mb-6">
+                        <h3 class="font-bold text-base mb-2 uppercase border-b border-slate-300 pb-1">1. THÔNG TIN CHUNG</h3>
+                        <table class="w-full border-collapse border border-slate-400 text-xs font-sans">
+                            <tbody>
+                                <tr>
+                                    <td class="border border-slate-400 p-2 font-semibold w-1/3 bg-slate-50">Tên dự án:</td>
+                                    <td class="border border-slate-400 p-2" id="pv-project-name">---</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-400 p-2 font-semibold bg-slate-50">Tên nhóm:</td>
+                                    <td class="border border-slate-400 p-2" id="pv-team-name">---</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-400 p-2 font-semibold bg-slate-50 align-top">Thành viên:</td>
+                                    <td class="border border-slate-400 p-2 space-y-1" id="pv-members">
+                                        <div>1. ---</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 2. PHÁT BIỂU VẤN ĐỀ -->
+                    <div class="mb-6">
+                        <h3 class="font-bold text-base mb-2 uppercase border-b border-slate-300 pb-1">2. PHÁT BIỂU VẤN ĐỀ</h3>
+                        <div class="bg-slate-50 p-4 border border-slate-200 rounded text-xs leading-relaxed space-y-2 font-sans">
+                            <p><span class="font-bold text-indigo-900">Dành cho </span> <span id="pv-target-user" class="underline font-semibold text-indigo-700">...................</span></p>
+                            <p><span class="font-bold text-indigo-900">Đang gặp khó khăn trong việc:</span></p>
+                            <ul id="pv-problem-difficulties" class="list-disc pl-6 space-y-1">
+                                <li class="italic text-slate-400">(Chưa nhập nỗi đau)</li>
+                            </ul>
+                            <div id="pv-problem-causes-container" class="mt-2 pt-2 border-t border-slate-200 space-y-2">
+                                <!-- Dynamic causes & consequences -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. NỖI ĐAU & GIẢI PHÁP -->
+                    <div class="mb-6">
+                        <h3 class="font-bold text-base mb-2 uppercase border-b border-slate-300 pb-1">3. NỖI ĐAU & GIẢI PHÁP</h3>
+                        <table class="w-full border-collapse border border-slate-400 text-xs font-sans">
+                            <thead>
+                                <tr class="bg-slate-100">
+                                    <th id="pain-point-header" class="border border-slate-400 p-2 w-1/2 text-left">Nỗi đau của người dùng</th>
+                                    <th class="border border-slate-400 p-2 w-1/2 text-left">Giải pháp tương ứng</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pv-painpoint-matrix">
+                                <tr>
+                                    <td class="border border-slate-400 p-2 italic text-slate-400" colspan="2">Chưa có dữ liệu nỗi đau & giải pháp</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 border border-slate-700">
+            <i id="toast-icon" data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+            <span id="toast-message" class="text-sm font-medium">Thông báo</span>
+        </div>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // State variables
+        let p2pChannel = null;
+        let peer = null;
+        let peerConnections = [];
+        let isUpdatingFromPeer = false;
+
+        // Initialize App on DOM Load
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            initP2PAndBroadcast();
+            
+            // Check saved local storage or load defaults
+            const savedData = localStorage.getItem('v2_project_doc');
+            if (savedData) {
+                try {
+                    loadFormData(JSON.parse(savedData));
+                } catch (e) {
+                    initDefaultSampleData();
+                }
+            } else {
+                initDefaultSampleData();
+            }
+        });
+
+        /* ----------------------------------------------------
+         * Data Structures & Render Functions
+         * ---------------------------------------------------- */
+        function getFormData() {
+            const projectName = document.getElementById('project-name').value;
+            const teamName = document.getElementById('team-name').value;
+            const targetUser = document.getElementById('target-user').value;
+            
+            // Collect Members
+            const memberInputs = document.querySelectorAll('.member-input');
+            const members = Array.from(memberInputs).map(i => i.value).filter(v => v.trim() !== '');
+
+            // Collect Pain Points
+            const painPointBlocks = document.querySelectorAll('.pain-point-block');
+            const painPoints = [];
+
+            painPointBlocks.forEach((block) => {
+                const name = block.querySelector('.pain-name').value;
+                const consequence = block.querySelector('.pain-consequence').value;
+                
+                const causeRows = block.querySelectorAll('.cause-row');
+                const causes = [];
+                causeRows.forEach(row => {
+                    causes.push({
+                        cause: row.querySelector('.cause-input').value,
+                        solution: row.querySelector('.solution-input').value
+                    });
+                });
+
+                painPoints.push({ name, consequence, causes });
+            });
+
+            return { projectName, teamName, targetUser, members, painPoints };
+        }
+
+        function loadFormData(data) {
+            if (!data) return;
+
+            document.getElementById('project-name').value = data.projectName || '';
+            document.getElementById('team-name').value = data.teamName || '';
+            document.getElementById('target-user').value = data.targetUser || '';
+
+            // Load Members
+            const membersContainer = document.getElementById('members-container');
+            membersContainer.innerHTML = '';
+            const members = (data.members && data.members.length > 0) ? data.members : [''];
+            members.forEach((m) => addMemberInput(m));
+
+            // Load Pain Points
+            const painContainer = document.getElementById('pain-points-container');
+            painContainer.innerHTML = '';
+            if (data.painPoints && data.painPoints.length > 0) {
+                data.painPoints.forEach(pp => addPainPointBlock(pp));
+            } else {
+                addPainPointBlock();
+            }
+
+            // Validate Regex
+            validateTargetUser(document.getElementById('target-user').value);
+
+            // Update Preview
+            updateLivePreview();
+        }
+
+        /* ----------------------------------------------------
+         * Dynamic Form Generators
+         * ---------------------------------------------------- */
+        function addMemberInput(value = '') {
+            const container = document.getElementById('members-container');
+            const index = container.children.length + 1;
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 member-row';
+            div.innerHTML = `
+                <span class="text-xs font-semibold text-slate-400 w-5">${index}.</span>
+                <input type="text" value="${escapeHtml(value)}" oninput="handleInputChange()" placeholder="Họ tên - MSSV - Vai trò" class="member-input flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                <button type="button" onclick="removeMemberRow(this)" class="p-1 text-slate-400 hover:text-red-500 rounded transition">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            `;
+            container.appendChild(div);
+            lucide.createIcons();
+            reindexMembers();
+        }
+
+        function removeMemberRow(btn) {
+            const container = document.getElementById('members-container');
+            if (container.children.length > 1) {
+                btn.closest('.member-row').remove();
+                reindexMembers();
+                handleInputChange();
+            } else {
+                showToast("Dự án cần ít nhất 1 thành viên!", "error");
+            }
+        }
+
+        function reindexMembers() {
+            const rows = document.querySelectorAll('.member-row');
+            rows.forEach((row, idx) => {
+                row.querySelector('span').textContent = `${idx + 1}.`;
+            });
+        }
+
+        function addPainPointBlock(data = null) {
+            const container = document.getElementById('pain-points-container');
+            const blockIndex = container.children.length + 1;
+            const div = document.createElement('div');
+            div.className = 'pain-point-block bg-slate-50 p-4 border border-slate-200 rounded-xl space-y-3 relative group';
+
+            const nameVal = data ? escapeHtml(data.name) : '';
+            const consVal = data ? escapeHtml(data.consequence) : '';
+
+            div.innerHTML = `
+                <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                    <span class="text-xs font-bold text-indigo-600 uppercase tracking-wide">Nỗi đau #${blockIndex}</span>
+                    <button type="button" onclick="removePainPointBlock(this)" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Xóa nỗi đau
+                    </button>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Tên Khó Khăn / Nỗi Đau</label>
+                    <input type="text" value="${nameVal}" oninput="handleInputChange()" placeholder="VD: Thất thoát hàng hóa và sai lệch tồn kho" class="pain-name w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-xs font-medium text-slate-700">Các Nguyên Nhân & Giải Pháp Tương Ứng</label>
+                    <div class="causes-container space-y-2"></div>
+                    <button type="button" onclick="addCauseRow(this)" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+                        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Thêm nguyên nhân & giải pháp
+                    </button>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Hậu Quả Liên Quan</label>
+                    <input type="text" value="${consVal}" oninput="handleInputChange()" placeholder="VD: Thất thoát dòng vốn, ảnh hưởng uy tín bán hàng" class="pain-consequence w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            `;
+
+            container.appendChild(div);
+            lucide.createIcons();
+
+            const causesContainer = div.querySelector('.causes-container');
+            if (data && data.causes && data.causes.length > 0) {
+                data.causes.forEach(c => addCauseRow(div.querySelector('button[onclick="addCauseRow(this)"]'), c));
+            } else {
+                addCauseRow(div.querySelector('button[onclick="addCauseRow(this)"]'));
+            }
+        }
+
+        function removePainPointBlock(btn) {
+            const container = document.getElementById('pain-points-container');
+            if (container.children.length > 1) {
+                btn.closest('.pain-point-block').remove();
+                handleInputChange();
+            } else {
+                showToast("Cần ít nhất 1 khối nỗi đau!", "error");
+            }
+        }
+
+        function addCauseRow(btn, causeData = null) {
+            const causesContainer = btn.previousElementSibling;
+            const div = document.createElement('div');
+            div.className = 'cause-row grid grid-cols-1 md:grid-cols-2 gap-2 bg-white p-2.5 rounded-lg border border-slate-200 relative';
+
+            const causeText = causeData ? escapeHtml(causeData.cause) : '';
+            const solText = causeData ? escapeHtml(causeData.solution) : '';
+
+            div.innerHTML = `
+                <div>
+                    <input type="text" value="${causeText}" oninput="handleInputChange()" placeholder="Nguyên nhân liên quan" class="cause-input w-full px-2.5 py-1 border border-slate-200 rounded text-xs outline-none focus:border-indigo-500">
+                </div>
+                <div class="flex gap-1">
+                    <input type="text" value="${solText}" oninput="handleInputChange()" placeholder="Giải pháp phần mềm tương ứng" class="solution-input w-full px-2.5 py-1 border border-slate-200 rounded text-xs outline-none focus:border-indigo-500">
+                    <button type="button" onclick="removeCauseRow(this)" class="text-slate-300 hover:text-red-500 p-1">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            `;
+            causesContainer.appendChild(div);
+            lucide.createIcons();
+        }
+
+        function removeCauseRow(btn) {
+            const causesContainer = btn.closest('.causes-container');
+            if (causesContainer.children.length > 1) {
+                btn.closest('.cause-row').remove();
+                handleInputChange();
+            } else {
+                showToast("Mỗi nỗi đau cần ít nhất 1 nguyên nhân!", "error");
+            }
+        }
+
+        /* ----------------------------------------------------
+         * Validation & Live Preview Updates
+         * ---------------------------------------------------- */
+        function validateTargetUser(value) {
+            // Only Latin/Vietnamese letters and spaces allowed: ^[A-Za-zÀ-ỹ\s]+$
+            const regex = /^[A-Za-zÀ-ỹ\s]+$/;
+            const errorEl = document.getElementById('target-user-error');
+            const inputEl = document.getElementById('target-user');
+
+            if (value.trim() !== '' && !regex.test(value)) {
+                errorEl.classList.remove('hidden');
+                inputEl.classList.add('border-red-500', 'bg-red-50');
+                return false;
+            } else {
+                errorEl.classList.add('hidden');
+                inputEl.classList.remove('border-red-500', 'bg-red-50');
+                return true;
+            }
+        }
+
+        function validateAndHandleUserTarget(input) {
+            validateTargetUser(input.value);
+            handleInputChange();
+        }
+
+        function handleInputChange() {
+            if (isUpdatingFromPeer) return;
+
+            const data = getFormData();
+            
+            // Save local
+            localStorage.setItem('v2_project_doc', JSON.stringify(data));
+
+            // Update Preview
+            updateLivePreview(data);
+
+            // Broadcast P2P Sync
+            broadcastData(data);
+        }
+
+        function updateLivePreview(formData = null) {
+            const data = formData || getFormData();
+
+            // Project & Team Name
+            document.getElementById('pv-project-name').textContent = data.projectName || '---';
+            document.getElementById('pv-team-name').textContent = data.teamName || '---';
+
+            // Target User
+            const targetUser = data.targetUser ? data.targetUser : '...................';
+            const targetUserSpan = document.getElementById('pv-target-user');
+            targetUserSpan.textContent = targetUser;
+            const painPointHeader = document.getElementById('pain-point-header');
+            painPointHeader.textContent = `Nỗi đau của ${targetUser}`;
+
+            // Members List (Each line on separate row)
+            const membersContainer = document.getElementById('pv-members');
+            membersContainer.innerHTML = '';
+            if (data.members && data.members.length > 0) {
+                data.members.forEach((m, idx) => {
+                    const div = document.createElement('div');
+                    div.textContent = `${idx + 1}. ${m}`;
+                    membersContainer.appendChild(div);
+                });
+            } else {
+                membersContainer.innerHTML = '<div>1. ...........................................................</div>';
+            }
+
+            // Problem Difficulties List
+            const difficultiesUl = document.getElementById('pv-problem-difficulties');
+            difficultiesUl.innerHTML = '';
+
+            const causesContainer = document.getElementById('pv-problem-causes-container');
+            causesContainer.innerHTML = '';
+
+            const matrixTbody = document.getElementById('pv-painpoint-matrix');
+            matrixTbody.innerHTML = '';
+
+            if (data.painPoints && data.painPoints.length > 0) {
+                data.painPoints.forEach((pp, pIdx) => {
+                    if (pp.name.trim()) {
+                        const li = document.createElement('li');
+                        li.textContent = pp.name;
+                        difficultiesUl.appendChild(li);
+                    }
+
+                    // Render causes & consequences in Problem Statement
+                    if (pp.causes && pp.causes.length > 0) {
+                        pp.causes.forEach((c) => {
+                            if (c.cause.trim() || pp.consequence.trim()) {
+                                const causeDiv = document.createElement('div');
+                                causeDiv.className = 'text-xs border-l-2 border-indigo-200 pl-2 space-y-0.5';
+                                causeDiv.innerHTML = `
+                                    <p><span class="font-semibold text-slate-700">Do:</span> ${escapeHtml(c.cause || '...')}</p>
+                                    <p><span class="font-semibold text-slate-700">Dẫn đến:</span> ${escapeHtml(pp.consequence || '...')}</p>
+                                `;
+                                causesContainer.appendChild(causeDiv);
+                            }
+
+                            // Render Matrix Table Row
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="border border-slate-400 p-2 align-top">
+                                    ${escapeHtml(c.cause || pp.name || '...')}
+                                </td>
+                                <td class="border border-slate-400 p-2 align-top">
+                                    ${escapeHtml(c.solution || '...')}
+                                </td>
+                            `;
+                            matrixTbody.appendChild(tr);
+                        });
+                    }
+                });
+            }
+
+            if (difficultiesUl.children.length === 0) {
+                difficultiesUl.innerHTML = '<li class="italic text-slate-400">(Chưa nhập nỗi đau)</li>';
+            }
+            if (matrixTbody.children.length === 0) {
+                matrixTbody.innerHTML = '<tr><td class="border border-slate-400 p-2 italic text-slate-400" colspan="2">Chưa có dữ liệu nỗi đau & giải pháp</td></tr>';
+            }
+        }
+
+        /* ----------------------------------------------------
+         * Peer-to-Peer (WebRTC + BroadcastChannel) Sync
+         * ---------------------------------------------------- */
+        function initP2PAndBroadcast() {
+            // Local Tab Sync via BroadcastChannel (Works completely offline & serverless)
+            try {
+                p2pChannel = new BroadcastChannel('v2_project_channel');
+                p2pChannel.onmessage = (event) => {
+                    if (event.data && event.data.type === 'SYNC_DATA') {
+                        applyPeerUpdate(event.data.payload);
+                    }
+                };
+                updateStatus(true, 'Tab Sync (Local P2P)');
+            } catch (e) {
+                console.log("BroadcastChannel error:", e);
+            }
+
+            // WebRTC PeerJS wrapped safely inside try/catch & window error filter
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const roomId = urlParams.get('room');
+
+                // Intercept global unhandled rejections/errors specifically for PeerJS WebSocket SecurityErrors
+                window.addEventListener('unhandledrejection', function (event) {
+                    if (event.reason && (event.reason.name === 'SecurityError' || String(event.reason).includes('WebSocket'))) {
+                        event.preventDefault(); // Suppress console error noise
+                        updateStatus(true, 'Tab Sync (Local P2P)');
+                    }
+                });
+
+                peer = new Peer({
+                    debug: 0, // Disable internal error logging to console
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:global.stun.twilio.com:3478' }
+                        ]
+                    }
+                });
+
+                peer.on('open', (id) => {
+                    updateStatus(true, roomId ? `Đã vào phòng: ${roomId}` : 'Đồng bộ Realtime');
+                    if (roomId) {
+                        connectToPeer(roomId);
+                    }
+                });
+
+                peer.on('connection', (conn) => {
+                    peerConnections.push(conn);
+                    setupConnHandlers(conn);
+                    showToast("Một thành viên vừa kết nối vào phòng!");
+                    // Send current state to new peer
+                    conn.send({ type: 'SYNC_DATA', payload: getFormData() });
+                });
+
+                peer.on('error', (err) => {
+                    // Quietly handle network/websocket restrictions in iframe environments
+                    updateStatus(true, 'Tab Sync (Local P2P)');
+                });
+            } catch (e) {
+                updateStatus(true, 'Tab Sync (Local P2P)');
+            }
+        }
+
+        function connectToPeer(targetId) {
+            if (!peer) return;
+            const conn = peer.connect(targetId);
+            peerConnections.push(conn);
+            setupConnHandlers(conn);
+        }
+
+        function setupConnHandlers(conn) {
+            conn.on('data', (data) => {
+                if (data && data.type === 'SYNC_DATA') {
+                    applyPeerUpdate(data.payload);
+                }
+            });
+            conn.on('close', () => {
+                peerConnections = peerConnections.filter(c => c !== conn);
+            });
+        }
+
+        function broadcastData(data) {
+            // 1. BroadcastChannel (Same Device Tabs)
+            if (p2pChannel) {
+                p2pChannel.postMessage({ type: 'SYNC_DATA', payload: data });
+            }
+            // 2. PeerJS Connections (Remote Peers)
+            peerConnections.forEach(conn => {
+                if (conn.open) {
+                    conn.send({ type: 'SYNC_DATA', payload: data });
+                }
+            });
+        }
+
+        function applyPeerUpdate(data) {
+            isUpdatingFromPeer = true;
+            loadFormData(data);
+            isUpdatingFromPeer = false;
+        }
+
+        function updateStatus(isOnline, text) {
+            const dot = document.getElementById('connection-status-dot');
+            const textEl = document.getElementById('connection-status-text');
+            if (isOnline) {
+                dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+                textEl.textContent = text;
+            } else {
+                dot.className = "w-2 h-2 rounded-full bg-amber-400";
+                textEl.textContent = "Offline Mode";
+            }
+        }
+
+        function copyShareLink() {
+            let shareUrl = window.location.href;
+            if (peer && peer.id && !window.location.search.includes('room=')) {
+                shareUrl += (shareUrl.includes('?') ? '&' : '?') + 'room=' + peer.id;
+            }
+            
+            // Clipboard Copy Command
+            const dummy = document.createElement('input');
+            document.body.appendChild(dummy);
+            dummy.value = shareUrl;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+
+            showToast("Đã sao chép đường dẫn chia sẻ P2P!");
+        }
+
+        /* ----------------------------------------------------
+         * DOCX File Generation (V2 Standard)
+         * ---------------------------------------------------- */
+        async function exportToDocx() {
+            const docxLib = window.docx || (typeof docx !== 'undefined' ? docx : null);
+            if (!docxLib) {
+                showToast("Thư viện Docx đang được tải, vui lòng thử lại sau giây lát!", "error");
+                return;
+            }
+
+            const data = getFormData();
+            const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle } = docxLib;
+
+            // Prepare Members Paragraphs
+            const memberParagraphs = (data.members && data.members.length > 0)
+                ? data.members.map((m, idx) => new Paragraph({
+                    children: [new TextRun({ text: `${idx + 1}. ${m}`, size: 22 })]
+                  }))
+                : [new Paragraph({ children: [new TextRun({ text: "1. ...........................................................", size: 22 })] })];
+
+            // Build Pain Points Matrix Rows
+            const matrixRows = [];
+            // Table Header
+            matrixRows.push(
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({ children: [
+                                new TextRun({ text: "Nỗi đau của ", bold: true, size: 22 }),
+                                new TextRun({ text: data.targetUser, bold: true, size: 22 })
+                            ] })],
+                            width: { size: 50, type: WidthType.PERCENTAGE },
+                            shading: { fill: "F1F5F9" }
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ children: [new TextRun({ text: "Giải pháp tương ứng", bold: true, size: 22 })] })],
+                            width: { size: 50, type: WidthType.PERCENTAGE },
+                            shading: { fill: "F1F5F9" }
+                        })
+                    ]
+                })
+            );
+
+            if (data.painPoints && data.painPoints.length > 0) {
+                data.painPoints.forEach(pp => {
+                    if (pp.causes && pp.causes.length > 0) {
+                        pp.causes.forEach(c => {
+                            matrixRows.push(
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            children: [new Paragraph({
+                                                children: [
+                                                    new TextRun({ text: c.cause || pp.name || '', size: 22 })
+                                                ]
+                                            })],
+                                            width: { size: 50, type: WidthType.PERCENTAGE }
+                                        }),
+                                        new TableCell({
+                                            children: [new Paragraph({
+                                                children: [
+                                                    new TextRun({ text: c.solution || '', size: 22 })
+                                                ]
+                                            })],
+                                            width: { size: 50, type: WidthType.PERCENTAGE }
+                                        })
+                                    ]
+                                })
+                            );
+                        });
+                    }
+                });
+            }
+
+            // Create Document
+            const doc = new Document({
+                sections: [{
+                    properties: {},
+                    children: [
+                        // Title
+                        new Paragraph({
+                            alignment: AlignmentType.CENTER,
+                            children: [
+                                new TextRun({ text: "BẢN ĐỊNH HƯỚNG DỰ ÁN", bold: true, size: 28 }),
+                            ]
+                        }),
+                        
+                        // Section 1: General Info
+                        new Paragraph({
+                            children: [new TextRun({ text: "1. THÔNG TIN CHUNG DỰ ÁN", bold: true, size: 24 })],
+                            spaceAfter: 150
+                        }),
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            rows: [
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            children: [new Paragraph({ children: [new TextRun({ text: "Tên dự án:", bold: true, size: 22 })] })],
+                                            width: { size: 35, type: WidthType.PERCENTAGE }
+                                        }),
+                                        new TableCell({
+                                            children: [new Paragraph({ children: [new TextRun({ text: data.projectName || '', size: 22 })] })],
+                                            width: { size: 65, type: WidthType.PERCENTAGE }
+                                        })
+                                    ]
+                                }),
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            children: [new Paragraph({ children: [new TextRun({ text: "Tên nhóm:", bold: true, size: 22 })] })],
+                                            width: { size: 35, type: WidthType.PERCENTAGE }
+                                        }),
+                                        new TableCell({
+                                            children: [new Paragraph({ children: [new TextRun({ text: data.teamName || '', size: 22 })] })],
+                                            width: { size: 65, type: WidthType.PERCENTAGE }
+                                        })
+                                    ]
+                                }),
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            children: [new Paragraph({ children: [new TextRun({ text: "Thành viên:", bold: true, size: 22 })] })],
+                                            width: { size: 35, type: WidthType.PERCENTAGE }
+                                        }),
+                                        new TableCell({
+                                            children: memberParagraphs,
+                                            width: { size: 65, type: WidthType.PERCENTAGE }
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+
+                        // Section 2: Problem Statement
+                        new Paragraph({
+                            children: [new TextRun({ text: "2. PHÁT BIỂU VẤN ĐỀ", bold: true, size: 24 })],
+                            spaceBefore: 300,
+                            spaceAfter: 150
+                        }),
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "Người ", size: 22 }),
+                                new TextRun({ text: data.targetUser || "...................", underline: {}, size: 22 })
+                            ]
+                        }),
+                        new Paragraph({
+                            children: [new TextRun({ text: "Đang gặp khó khăn trong việc:", size: 22 })]
+                        }),
+                        ...(data.painPoints || []).map(pp => new Paragraph({
+                            bullet: { level: 0 },
+                            children: [new TextRun({ text: pp.name || '', size: 22 })]
+                        })),
+                        ...(data.painPoints || []).flatMap(pp => (pp.causes || []).map(c => new Paragraph({
+                            children: [
+                                new TextRun({ text: "Do ", bold: true, size: 22 }),
+                                new TextRun({ text: c.cause || '', size: 22 }),
+                                new TextRun({ text: " dẫn đến ", bold: true, size: 22 }),
+                                new TextRun({ text: pp.consequence || '', size: 22 })
+                            ]
+                        }))),
+
+                        // Section 3: Pain points & Solutions Matrix
+                        new Paragraph({
+                            children: [new TextRun({ text: "3. NỖI ĐAU & GIẢI PHÁP SỐ", bold: true, size: 24 })],
+                            spaceBefore: 300,
+                            spaceAfter: 150
+                        }),
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            rows: matrixRows
+                        })
+                    ]
+                }]
+            });
+
+            // Pack & Save File
+            Packer.toBlob(doc).then((blob) => {
+                const fileName = (data.projectName ? data.projectName.replace(/[^a-zA-Z0-9]/g, "_") : "Tai_Lieu_Dinh_Huong_V2") + ".docx";
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast("Đã xuất file DOCX thành công!");
+            }).catch(err => {
+                console.error("Export DOCX Error:", err);
+                showToast("Lỗi khi xuất file Word!", "error");
+            });
+        }
+
+        /* ----------------------------------------------------
+         * Sample Data & Utilities
+         * ---------------------------------------------------- */
+        function initDefaultSampleData() {
+            const sampleData = {
+                projectName: "Hệ thống Quản lý Bán hàng & Tồn kho FashionStore",
+                teamName: "Nhóm PTPM",
+                targetUser: "chủ cửa hàng thời trang vừa và nhỏ",
+                members: [
+                    "Nguyễn Văn A",
+                    "Trần Thị B",
+                    "Lê Hoàng C"
+                ],
+                painPoints: [
+                    {
+                        name: "Thất thoát hàng hóa và sai lệch tồn kho giữa cửa hàng và kho",
+                        causes: [
+                            {
+                                cause: "Ghi chép sổ sách thủ công, chậm cập nhật số lượng nhập xuất",
+                                solution: "Tính năng Quản lý Tồn kho thời gian thực (Real-time Inventory)"
+                            },
+                            {
+                                cause: "Không quét mã vạch khi kiểm hàng dẫn đến nhầm lẫn mã sản phẩm",
+                                solution: "Tích hợp Quét mã vạch Barcode/QR Code khi kiểm kho & thanh toán"
+                            }
+                        ],
+                        consequence: "Đột quỵ dòng vốn do đọng hàng, mất uy tín do hết hàng khi khách đặt"
+                    },
+                    {
+                        name: "Chậm trễ trong quá trình thanh toán và tính toán doanh thu cuối ngày",
+                        causes: [
+                            {
+                                cause: "Nhân viên tính tiền bằng máy tính tay và thu tiền mặt thủ công",
+                                solution: "Màn hình POS bán hàng nhanh và tự động tính tiền, in hóa đơn"
+                            }
+                        ],
+                        consequence: "Khách hàng phải chờ đợi lâu gây trải nghiệm xấu"
+                    }
+                ]
+            };
+
+            loadFormData(sampleData);
+        }
+
+        function resetDefaultData() {
+            if (confirm("Bạn có chắc chắn muốn tải lại dữ liệu mẫu ban đầu?")) {
+                initDefaultSampleData();
+                showToast("Đã tải lại dữ liệu mẫu thành công!");
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function showToast(message, type = "success") {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMsg.textContent = message;
+            if (type === "error") {
+                toastIcon.setAttribute('data-lucide', 'alert-circle');
+                toastIcon.className = 'w-5 h-5 text-red-400';
+            } else {
+                toastIcon.setAttribute('data-lucide', 'check-circle');
+                toastIcon.className = 'w-5 h-5 text-emerald-400';
+            }
+            lucide.createIcons();
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
